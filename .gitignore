@@ -1,0 +1,36 @@
+# Node modules
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Runtime files
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment variables
+.env
+.env.*.local
+
+# Build output
+dist/
+build/
+out/
+.next/
+
+# Testing
+coverage/
+
+# Caches
+.cache/
+.parcel-cache/
+
+# Editor directories and system files
+.vscode/
+.idea/
+.DS_Store
