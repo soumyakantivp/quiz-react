@@ -2,8 +2,8 @@ import React from 'react';
 
 const Question = ({ question, onAnswer, onSkip }) => {
     const handleOptionClick = (selectedOption) => {
-        const isCorrect = selectedOption === question.answer;
-        onAnswer(isCorrect, selectedOption);
+        // delegate correctness check to the parent (which calls API)
+        onAnswer(selectedOption);
     };
 
     return (

@@ -1,47 +1,85 @@
 import React, { useState, useEffect } from 'react';
 import Question from './Question';
-import Timer from './Timer';
 import Score from './Score';
 import Review from './Review';
-import questions from '../data/questions';
 
-const Quiz = () => {
+// API endpoints (use absolute backend URLs since CORS is allowed)
+const QUIZ_ALL_URL = 'http://localhost:8080/quiz/all';
+
+
+const Quiz = ({ setTimeLeft }) => {
+    const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [score, setScore] = useState(0);
-    const [totalQuestions] = useState(questions.length);
+    const [totalQuestions, setTotalQuestions] = useState(0);
     const [isQuizFinished, setIsQuizFinished] = useState(false);
-    const [timeLeft, setTimeLeft] = useState(300); // 5 minutes timer
+    const [timeLeftLocal, setTimeLeftLocal] = useState(300); // 5 minutes timer
     const [answeredQuestions, setAnsweredQuestions] = useState([]);
     const [showReview, setShowReview] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (timeLeft > 0 && !isQuizFinished) {
+        if (timeLeftLocal > 0 && !isQuizFinished) {
             const timerId = setInterval(() => {
-                setTimeLeft(prevTime => prevTime - 1);
+                setTimeLeftLocal(prevTime => prevTime - 1);
             }, 1000);
             return () => clearInterval(timerId);
-        } else if (timeLeft === 0) {
+        } else if (timeLeftLocal === 0) {
             setIsQuizFinished(true);
         }
-    }, [timeLeft, isQuizFinished]);
+    }, [timeLeftLocal, isQuizFinished]);
 
-    const handleAnswer = (isCorrect, selectedAnswer) => {
+    // Sync timer with parent for header display
+    useEffect(() => {
+        if (setTimeLeft) setTimeLeft(timeLeftLocal);
+    }, [timeLeftLocal, setTimeLeft]);
+
+    // Fetch questions from API on mount
+    useEffect(() => {
+        let mounted = true;
+        const fetchQuestions = async () => {
+            try {
+                const res = await fetch(QUIZ_ALL_URL);
+                const data = await res.json();
+
+                // map API shape to local shape expected by components, include rightAnswer
+                const mapped = data.map(item => ({
+                    id: item.id,
+                    question: item.questionTilte || item.questionTitle || item.question,
+                    options: [item.option1, item.option2, item.option3, item.option4],
+                    correctAnswer: item.rightAnswer
+                }));
+
+                if (mounted) {
+                    setQuestions(mapped);
+                    setTotalQuestions(mapped.length);
+                    setLoading(false);
+                }
+            } catch (err) {
+                console.error('Failed to load questions', err);
+                if (mounted) setLoading(false);
+            }
+        };
+        fetchQuestions();
+        return () => { mounted = false; };
+    }, []);
+
+    const handleAnswer = (selectedAnswer) => {
         const currentQuestion = questions[currentQuestionIndex];
-        
-        // Track the answered question
+        // Verify answer locally using correctAnswer from question object
+        const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+
         setAnsweredQuestions(prev => [...prev, {
             question: currentQuestion.question,
             options: currentQuestion.options,
             userAnswer: selectedAnswer,
-            correctAnswer: currentQuestion.answer,
+            correctAnswer: currentQuestion.correctAnswer,
             isCorrect: isCorrect
         }]);
 
-        if (isCorrect) {
-            setScore(prevScore => prevScore + 4);
-        } else {
-            setScore(prevScore => prevScore - 1);
-        }
+        if (isCorrect) setScore(prevScore => prevScore + 4);
+        else setScore(prevScore => prevScore - 1);
+
         nextQuestion();
     };
 
@@ -60,7 +98,7 @@ const Quiz = () => {
             question: currentQuestion.question,
             options: currentQuestion.options,
             userAnswer: null,
-            correctAnswer: currentQuestion.answer,
+            correctAnswer: currentQuestion.correctAnswer,
             isCorrect: false
         }]);
         nextQuestion();
@@ -70,7 +108,7 @@ const Quiz = () => {
         setCurrentQuestionIndex(0);
         setScore(0);
         setIsQuizFinished(false);
-        setTimeLeft(300);
+        setTimeLeftLocal(300);
         setAnsweredQuestions([]);
         setShowReview(false);
     };
@@ -99,17 +137,21 @@ const Quiz = () => {
         />;
     }
 
+    if (loading) return <div>Loading questions...</div>;
+
     return (
         <div className="quiz-container">
-            <Timer timeLeft={timeLeft} />
+            {/* Timer moved to header */}
             <div className="question-counter">
                 Question {currentQuestionIndex + 1} of {totalQuestions}
             </div>
-            <Question 
-                question={questions[currentQuestionIndex]} 
-                onAnswer={handleAnswer} 
-                onSkip={skipQuestion} 
-            />
+            {questions.length > 0 && (
+                <Question 
+                    question={questions[currentQuestionIndex]} 
+                    onAnswer={handleAnswer} 
+                    onSkip={skipQuestion} 
+                />
+            )}
         </div>
     );
 };
