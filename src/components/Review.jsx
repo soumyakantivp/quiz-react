@@ -8,6 +8,10 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
     const correctCount = answeredQuestions.filter(q => q.isCorrect).length;
 
     const [aiChunks, setAiChunks] = useState([]);
+    const [selectedLanguage, setSelectedLanguage] = useState('en');
+    const [translatedChunks, setTranslatedChunks] = useState([]);
+    const [isTranslating, setIsTranslating] = useState(false);
+    const [rawEnglishText, setRawEnglishText] = useState('');
     
     // Helper function to parse markdown bold format: **text** → <strong>text</strong>
     const renderWithBold = (text) => {
@@ -123,8 +127,162 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
         return applySpacingRules(t);
     };
 
+    // Translate text to selected language using Google Translate API
+    const translateText = async (text, targetLang) => {
+        if (targetLang === 'en') {
+            setTranslatedChunks([]);
+            return;
+        }
+
+        setIsTranslating(true);
+        try {
+            console.log('=== TRANSLATION REQUEST ===');
+            console.log('Full text to translate:', text);
+            console.log('Target language:', targetLang);
+            console.log('Text length:', text.length);
+            
+            // Strategy: Extract math expressions and their positions
+            // Translate only the text parts, keep math expressions untouched
+            const mathRegex = /(\\\[[\s\S]*?\\\]|\\\([\s\S]*?\))/g;
+            const parts = [];
+            let lastIndex = 0;
+            let match;
+            
+            // Split text into alternating [text, math, text, math, ...]
+            while ((match = mathRegex.exec(text)) !== null) {
+                // Add text before this math expression
+                if (match.index > lastIndex) {
+                    parts.push({
+                        type: 'text',
+                        content: text.substring(lastIndex, match.index)
+                    });
+                }
+                // Add the math expression
+                parts.push({
+                    type: 'math',
+                    content: match[0]
+                });
+                lastIndex = match.index + match[0].length;
+            }
+            // Add remaining text after last math expression
+            if (lastIndex < text.length) {
+                parts.push({
+                    type: 'text',
+                    content: text.substring(lastIndex)
+                });
+            }
+            
+            console.log('Text split into parts:', parts.length);
+            parts.forEach((part, idx) => {
+                console.log(`Part ${idx} (${part.type}): ${part.content.substring(0, 60)}...`);
+            });
+            
+            // Translate only text parts
+            const translatedParts = [];
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                
+                if (part.type === 'math') {
+                    // Keep math expressions as-is
+                    translatedParts.push(part.content);
+                } else if (part.type === 'text') {
+                    // Translate text part
+                    const textToTranslate = part.content.trim();
+                    if (!textToTranslate) {
+                        translatedParts.push(part.content);
+                        continue;
+                    }
+                    
+                    console.log(`\nTranslating text part ${i}: "${textToTranslate.substring(0, 80)}..."`);
+                    
+                    // Split into smaller chunks if needed
+                    const MAX_CHUNK_SIZE = 300;
+                    const chunks = [];
+                    
+                    for (let j = 0; j < textToTranslate.length; j += MAX_CHUNK_SIZE) {
+                        let chunk = textToTranslate.substring(j, j + MAX_CHUNK_SIZE);
+                        
+                        // Try to break at word boundary
+                        if (j + MAX_CHUNK_SIZE < textToTranslate.length) {
+                            const lastSpace = chunk.lastIndexOf(' ');
+                            if (lastSpace > MAX_CHUNK_SIZE * 0.7) {
+                                chunk = chunk.substring(0, lastSpace + 1);
+                                j -= (MAX_CHUNK_SIZE - lastSpace - 1);
+                            }
+                        }
+                        
+                        if (chunk.trim()) {
+                            chunks.push(chunk.trim());
+                        }
+                    }
+                    
+                    const translatedChunks = [];
+                    for (let j = 0; j < chunks.length; j++) {
+                        const chunk = chunks[j];
+                        console.log(`  Chunk ${j + 1}/${chunks.length}: "${chunk.substring(0, 60)}..."`);
+                        
+                        const encodedText = encodeURIComponent(chunk);
+                        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodedText}`;
+                        
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        const translatedChunk = data[0][0][0];
+                        
+                        console.log(`  Translated: "${translatedChunk.substring(0, 60)}..."`);
+                        translatedChunks.push(translatedChunk);
+                        
+                        if (j < chunks.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                        }
+                    }
+                    
+                    const combinedText = translatedChunks.join(' ');
+                    translatedParts.push(combinedText);
+                }
+            }
+            
+            console.log('\n=== FINAL RECONSTRUCTION ===');
+            let finalTranslation = '';
+            for (let i = 0; i < translatedParts.length; i++) {
+                const part = translatedParts[i];
+                const isMath = part.startsWith('\\[') || part.startsWith('\\(');
+                
+                if (isMath) {
+                    // Add space before and after math expressions
+                    finalTranslation += ' ' + part + ' ';
+                } else {
+                    finalTranslation += part;
+                }
+            }
+            
+            // Clean up multiple spaces
+            finalTranslation = finalTranslation.replace(/\s+/g, ' ').trim();
+            console.log('Final translation:', finalTranslation);
+            
+            setTranslatedChunks([renderMathFriendly(finalTranslation)]);
+        } catch (err) {
+            console.error('Translation error:', err);
+            setAiError('Error: Failed to translate response.');
+        } finally {
+            setIsTranslating(false);
+        }
+    };
+
+    // Handle language change
+    const handleLanguageChange = (e) => {
+        const newLang = e.target.value;
+        setSelectedLanguage(newLang);
+        
+        if (rawEnglishText) {
+            translateText(rawEnglishText, newLang);
+        }
+    };
+
     const handleNext = () => {
         setAiChunks([]); setAiError('');
+        setSelectedLanguage('en');
+        setTranslatedChunks([]);
+        setRawEnglishText('');
         if (currentIndex < answeredQuestions.length - 1) {
             setCurrentIndex(currentIndex + 1);
         }
@@ -132,6 +290,9 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
 
     const handlePrevious = () => {
         setAiChunks([]); setAiError('');
+        setSelectedLanguage('en');
+        setTranslatedChunks([]);
+        setRawEnglishText('');
         if (currentIndex > 0) {
             setCurrentIndex(currentIndex - 1);
         }
@@ -142,6 +303,9 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
         setAiChunks([]);
         setAiError('');
         setAiLoading(true);
+        setSelectedLanguage('en');
+        setTranslatedChunks([]);
+        setRawEnglishText('');
         let rawText = ''; // Accumulate raw text like in earlier code
         let streamedChunks = [];
         try {
@@ -224,6 +388,9 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                 // Normalize spacing
                 joined = joined.replace(/\s{2,}/g, ' ').trim();
                 
+                // Store raw English text for translation
+                setRawEnglishText(joined);
+                
                 // Apply math formatting and set as single formatted block
                 const formatted = renderMathFriendly(joined);
                 setAiChunks([formatted]);
@@ -302,13 +469,33 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                         Next →
                     </button>
                 </div>
+
+                {aiChunks.length > 0 && !aiLoading && (
+                    <div style={{marginTop:12,display:'flex',alignItems:'center',gap:'10px',justifyContent:'center'}}>
+                        <label htmlFor="language-select" style={{fontWeight:500,fontSize:'0.95em'}}>Language:</label>
+                        <select 
+                            id="language-select"
+                            value={selectedLanguage} 
+                            onChange={handleLanguageChange}
+                            disabled={isTranslating}
+                            style={{padding:'6px 10px',borderRadius:'4px',border:'1px solid #ddd',fontSize:'0.95em',cursor:'pointer',fontWeight:500}}
+                        >
+                            <option value="en">English</option>
+                            <option value="bn">Bengali</option>
+                        </select>
+                        {isTranslating && <span style={{fontSize:'0.9em',color:'#666'}}>Translating...</span>}
+                    </div>
+                )}
+
                 {(aiLoading || aiChunks.length > 0) && (
                     <div style={{marginTop:16,background:'#f7f7fa',borderRadius:12,padding:'14px 12px',color:'#232946',fontSize:'1em',boxShadow:'0 1.5px 8px 0 rgba(44,22,100,0.08)',whiteSpace:'pre-wrap',wordWrap:'break-word'}}>
                         <strong>Solution:</strong>
                         <div>
-                            {aiChunks.length === 0 && aiLoading ? 'Loading...' : aiChunks.map((chunk, idx) => (
+                            {aiChunks.length === 0 && aiLoading ? 'Loading...' : (translatedChunks.length > 0 ? translatedChunks.map((chunk, idx) => (
                                 <div key={idx} style={{marginBottom:4}}>{renderWithBold(chunk)}</div>
-                            ))}
+                            )) : aiChunks.map((chunk, idx) => (
+                                <div key={idx} style={{marginBottom:4}}>{renderWithBold(chunk)}</div>
+                            )))}
                         </div>
                     </div>
                 )}
