@@ -1,9 +1,9 @@
 // Math-friendly formatter for AI output
+// Converts mathematical LaTeX expressions and equations into readable text
+// Handles special symbols, formatting, and layout preservation
 export function renderMathFriendly(raw) {
   if (!raw) return '';
   
-  // Store the original raw input to log at the end
-  const originalRaw = String(raw);
   let s = String(raw);
   
   // Normalize different newline styles to \n
@@ -18,21 +18,25 @@ export function renderMathFriendly(raw) {
   
   const mathTransforms = (text) => {
     let t = text;
-    // First, convert LaTeX commands to symbols
-    t = t.replace(/\\\s*div/g, '÷');
-    t = t.replace(/\\\s*times/g, '×');
-    t = t.replace(/\\\s*cdot/g, '·');
+    // Convert LaTeX commands to readable symbols
+    t = t.replace(/\\\s*div/g, '÷');        // \\div → ÷
+    t = t.replace(/\\\s*times/g, '×');      // \\times → ×
+    t = t.replace(/\\\s*cdot/g, '·');       // \\cdot → ·
+    // Extract text from LaTeX \\text{} command
     t = t.replace(/\\\s*text\s*\{\s*([^}]+?)\s*\}/g, (m, content) => ' ' + content.trim() + ' ');
+    // Convert LaTeX fractions \\frac{a}{b} → (a/b)
     t = t.replace(/\\\s*frac\s*\{\s*([^}]+?)\s*\}\s*\{\s*([^}]+?)\s*\}/g, '($1/$2)');
     
-    // Handle special LaTeX
-    t = t.replace(/\%/g, '%');
-    t = t.replace(/\\\s*%/g, '%');
+    // Handle special LaTeX: percent sign and escaped percent
+    t = t.replace(/\\\s*%/g, '%');          // \\% → %
+    // Square root notation: \\sqrt[n]{x} → n√(x), \\sqrt{x} → √(x)
     t = t.replace(/\\\s*sqrt\s*\[\s*(\d+)\s*\]\s*\{\s*([^}]+?)\s*\}/g, '$1√($2)');
     t = t.replace(/\\\s*sqrt\s*\{\s*([^}]+?)\s*\}/g, '√($1)');
+    // Remove LaTeX bracket modifiers
     t = t.replace(/\\\s*left/g, '').replace(/\\\s*right/g, '');
-    t = t.replace(/^\\\[(.*)\\\]$/s, '$1');
-    t = t.replace(/^\\\((.*)\\\)$/s, '$1');
+    // Remove LaTeX delimiters for display and inline math
+    t = t.replace(/^\\\[(.*?)\\\]$/s, '$1');  // \\[...\\] → ...
+    t = t.replace(/^\\\((.*?)\\\)$/s, '$1');  // \\(...\\) → ...
     
     // Convert exponents
     const toSup = (d) => d.split('').map(ch => ({'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'}[ch]||ch)).join('');
@@ -163,9 +167,9 @@ export function renderMathFriendly(raw) {
   result = result.replace(/\n{3,}/g, '\n\n');
   
   // Log the raw stream response received
-  console.log('=== RAW STREAM RESPONSE ===');
-  console.log(originalRaw);
-  console.log('=== END RAW RESPONSE ===\n');
+  // console.log('=== RAW STREAM RESPONSE ===');
+  // console.log(originalRaw);
+  // console.log('=== END RAW RESPONSE ===\n');
   
   return result;
 }

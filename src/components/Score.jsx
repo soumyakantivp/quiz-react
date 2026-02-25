@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Score = ({ score, totalQuestions, onReview, onRetry }) => {
+const Score = ({ score, totalQuestions, onReview, onRetry, onBackToTopics }) => {
     const maxScore = totalQuestions * 4;
     const percentage = (score / maxScore) * 100;
     const result = percentage >= 70 ? 'Pass' : 'Fail';
@@ -15,6 +15,9 @@ const Score = ({ score, totalQuestions, onReview, onRetry }) => {
             <div className="button-group">
                 <button onClick={onReview} className="review-button">Review Answers</button>
                 <button onClick={onRetry} className="retry-button">Retry Quiz</button>
+                {onBackToTopics && (
+                    <button onClick={onBackToTopics} className="back-button" style={{backgroundColor: '#f5f5f5', color: '#666', border: '1px solid #ddd'}}>Back to Topics</button>
+                )}
             </div>
         </div>
     );

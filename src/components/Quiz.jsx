@@ -5,9 +5,12 @@ import Review from './Review';
 
 // API endpoints (use absolute backend URLs since CORS is allowed)
 const QUIZ_ALL_URL = 'http://localhost:8080/quiz/all';
+// Future endpoint: filter questions by category and topic
+// const QUIZ_BY_TOPIC_URL = (examName, category, topic) => 
+//     `http://localhost:8080/quiz/by-topic?exam=${encodeURIComponent(examName)}&category=${encodeURIComponent(category)}&topic=${encodeURIComponent(topic)}`;
 
 
-const Quiz = ({ setTimeLeft }) => {
+const Quiz = ({ setTimeLeft, examData, onBack }) => {
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [score, setScore] = useState(0);
@@ -35,6 +38,9 @@ const Quiz = ({ setTimeLeft }) => {
     }, [timeLeftLocal, setTimeLeft]);
 
     // Fetch questions from API on mount
+    // Currently fetches all questions from /quiz/all
+    // TODO: Update to fetch topic-specific questions once backend endpoint is available
+    // Would use: QUIZ_BY_TOPIC_URL(examData.examName, examData.category, examData.topicName)
     useEffect(() => {
         let mounted = true;
         const fetchQuestions = async () => {
@@ -56,7 +62,7 @@ const Quiz = ({ setTimeLeft }) => {
                     setLoading(false);
                 }
             } catch (err) {
-                console.error('Failed to load questions', err);
+                // console.error('Failed to load questions', err);
                 if (mounted) setLoading(false);
             }
         };
@@ -134,6 +140,7 @@ const Quiz = ({ setTimeLeft }) => {
             totalQuestions={totalQuestions} 
             onReview={handleShowReview}
             onRetry={handleRetry}
+            onBackToTopics={onBack}
         />;
     }
 

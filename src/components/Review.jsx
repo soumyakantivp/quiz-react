@@ -39,19 +39,17 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
         const lastChar = accumulated[accumulated.length - 1];
         const firstChar = chunk[0];
         
-        // Detect if we need a space
         const lastIsLetter = /[a-zA-Z]/.test(lastChar);
         const lastIsDigit = /\d/.test(lastChar);
-        const lastIsCloseBracket = /[)\]}\]]/.test(lastChar);
+        const lastIsCloseBracket = /[)\]}]/.test(lastChar);
         const lastIsPercent = lastChar === '%';
         const lastIsOperator = /[+\-×÷=]/.test(lastChar);
-        const lastIsPeriod = lastChar === '.';
         
         const firstIsLetter = /[a-zA-Z]/.test(firstChar);
         const firstIsDigit = /\d/.test(firstChar);
-        const firstIsOpenBracket = /[(\[{]/.test(firstChar);
+        const firstIsOpenBracket = /[([{]/.test(firstChar);
         const firstIsOperator = /[+\-×÷=]/.test(firstChar);
-        const firstIsPercent = firstChar === '%';
+
         
         let needsSpace = false;
         
@@ -74,6 +72,8 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
     };
     
     // Helper to apply spacing rules within text (fixes word concatenation during streaming)
+    // Intelligently adds spaces between words and mathematical expressions
+    // Examples: "solveThe" → "solve The", "calculate2" → "calculate 2"
     const applySpacingRules = (text) => {
         if (!text) return text;
         let t = text;
@@ -111,21 +111,7 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
         
         return t;
     };
-    
-    // Basic formatting for real-time display (does NOT apply full renderMathFriendly)
-    // This ensures real-time streaming looks like the final formatted output
-    const applyBasicFormatting = (text) => {
-        if (!text) return text;
-        // Just apply spacing rules, not full math transforms
-        // This matches what renderMathFriendly will do, but without the complex paragraph processing
-        let t = text;
-        // Remove newlines
-        t = t.replace(/\r?\n/g, ' ').replace(/\r/g, ' ');
-        // Normalize spaces
-        t = t.replace(/[ \t]{2,}/g, ' ');
-        // Apply spacing fixes
-        return applySpacingRules(t);
-    };
+
 
     // Translate text to selected language using Google Translate API
     const translateText = async (text, targetLang) => {
@@ -136,10 +122,10 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
 
         setIsTranslating(true);
         try {
-            console.log('=== TRANSLATION REQUEST ===');
-            console.log('Full text to translate:', text);
-            console.log('Target language:', targetLang);
-            console.log('Text length:', text.length);
+            // console.log('=== TRANSLATION REQUEST ===');
+            // console.log('Full text to translate:', text);
+            // console.log('Target language:', targetLang);
+            // console.log('Text length:', text.length);
             
             // Strategy: Extract math expressions and their positions
             // Translate only the text parts, keep math expressions untouched
@@ -172,9 +158,9 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                 });
             }
             
-            console.log('Text split into parts:', parts.length);
+            // console.log('Text split into parts:', parts.length);
             parts.forEach((part, idx) => {
-                console.log(`Part ${idx} (${part.type}): ${part.content.substring(0, 60)}...`);
+                // console.log(`Part ${idx} (${part.type}): ${part.content.substring(0, 60)}...`);
             });
             
             // Translate only text parts
@@ -193,7 +179,7 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                         continue;
                     }
                     
-                    console.log(`\nTranslating text part ${i}: "${textToTranslate.substring(0, 80)}..."`);
+                    // console.log(`\nTranslating text part ${i}: "${textToTranslate.substring(0, 80)}..."`);
                     
                     // Split into smaller chunks if needed
                     const MAX_CHUNK_SIZE = 300;
@@ -219,7 +205,7 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                     const translatedChunks = [];
                     for (let j = 0; j < chunks.length; j++) {
                         const chunk = chunks[j];
-                        console.log(`  Chunk ${j + 1}/${chunks.length}: "${chunk.substring(0, 60)}..."`);
+                        // console.log(`  Chunk ${j + 1}/${chunks.length}: "${chunk.substring(0, 60)}..."`);
                         
                         const encodedText = encodeURIComponent(chunk);
                         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodedText}`;
@@ -228,7 +214,7 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                         const data = await response.json();
                         const translatedChunk = data[0][0][0];
                         
-                        console.log(`  Translated: "${translatedChunk.substring(0, 60)}..."`);
+                        // console.log(`  Translated: "${translatedChunk.substring(0, 60)}..."`);
                         translatedChunks.push(translatedChunk);
                         
                         if (j < chunks.length - 1) {
@@ -241,7 +227,7 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                 }
             }
             
-            console.log('\n=== FINAL RECONSTRUCTION ===');
+            // console.log('\n=== FINAL RECONSTRUCTION ===');
             let finalTranslation = '';
             for (let i = 0; i < translatedParts.length; i++) {
                 const part = translatedParts[i];
@@ -257,11 +243,11 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
             
             // Clean up multiple spaces
             finalTranslation = finalTranslation.replace(/\s+/g, ' ').trim();
-            console.log('Final translation:', finalTranslation);
+            // console.log('Final translation:', finalTranslation);
             
             setTranslatedChunks([renderMathFriendly(finalTranslation)]);
         } catch (err) {
-            console.error('Translation error:', err);
+            // console.error('Translation error:', err);
             setAiError('Error: Failed to translate response.');
         } finally {
             setIsTranslating(false);
@@ -445,7 +431,7 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                     <p className="skipped-text">You skipped this question</p>
                 )}
 
-                <div className="review-buttons" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}}>
+                <div className="review-buttons" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'12px'}}>
                     <button 
                         onClick={handlePrevious} 
                         disabled={currentIndex === 0 || aiLoading}
@@ -455,8 +441,7 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                     </button>
                     <button 
                         onClick={handleSolve}
-                        className="nav-button"
-                        style={{background:'#fffbe7',color:'#3a2676',fontWeight:600,minWidth:90,border:'1.5px solid #ffe082'}}
+                        className="solve-button"
                         disabled={aiLoading}
                     >
                         {aiLoading ? 'Solving...' : 'Solve'}
@@ -488,7 +473,7 @@ const Review = ({ answeredQuestions, onBack, onRetry }) => {
                 )}
 
                 {(aiLoading || aiChunks.length > 0) && (
-                    <div style={{marginTop:16,background:'#f7f7fa',borderRadius:12,padding:'14px 12px',color:'#232946',fontSize:'1em',boxShadow:'0 1.5px 8px 0 rgba(44,22,100,0.08)',whiteSpace:'pre-wrap',wordWrap:'break-word'}}>
+                    <div style={{marginTop:16,background:'var(--bg-secondary)',borderRadius:12,padding:'14px 12px',color:'var(--text-primary)',fontSize:'1em',boxShadow:'0 1.5px 8px 0 rgba(44,22,100,0.08)',whiteSpace:'pre-wrap',wordWrap:'break-word',border:'1px solid var(--border-color)'}}>
                         <strong>Solution:</strong>
                         <div>
                             {aiChunks.length === 0 && aiLoading ? 'Loading...' : (translatedChunks.length > 0 ? translatedChunks.map((chunk, idx) => (
